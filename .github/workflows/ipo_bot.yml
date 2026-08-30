@@ -1,0 +1,42 @@
+name: IPO Watcher Bot
+
+on:
+  schedule:
+    # 2日に1回、日本時間 AM 8:00 (UTC 23:00) に実行
+    - cron: '0 23 */2 * *'
+  workflow_dispatch: # GitHubの管理画面から手動実行できるようにする設定
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # 状態ファイル(json)をcommit/pushする権限
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: |
+          pip install requests beautifulsoup4 pypdf google-genai
+
+      - name: Run IPO Notifier
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          GEMINI_MODEL: 'gemini-3.6-flash'
+        run: |
+          python ipo_notifier.py
+
+      - name: Commit and Push State File
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add notified_ipos.json
+          git commit -m "Update notified IPOs state [skip ci]" || echo "No changes to commit"
+          git push
